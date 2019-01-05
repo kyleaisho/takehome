@@ -1,0 +1,16 @@
+{
+  "name": "pex",
+  "version": "1.0.0",
+  "description": "Front end challenge for pex engineering candidates.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Kyle Aisho",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "eslint": "^5.12.0",
+    "mocha": "^5.2.0",
+    "eslint-plugin-fp": "^2.3.0"
+  }
+}
