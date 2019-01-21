@@ -1,3 +1,5 @@
+/* eslint-disable fp/no-nil */
+/* eslint-disable fp/no-unused-expression */
 const Immutable = require('immutable');
 const assert = require('assert');
 
@@ -8,68 +10,45 @@ function getFlatten() {
 
 function transformErrors(errors, ignoreKeys) {
   return Immutable.Map(
-    getFlatten().flatten(errors, ignoreKeys)
+    getFlatten().flattenErrorProps(errors, ignoreKeys)
   );
 }
-
-xit('non nested objects', () => {
-  assert.deepEqual(transformErrors({
-    error: 'This is an error',
-    error2: 'This is an error2',
-  }).toJS(), {
-    error: 'This is an error',
-    error2: 'This is an error2',
-  })
-});
-
-xdescribe('Array concatenate', () => {
-  it('empty array returns empty string', () => {
-    // this is an assumption
-    assert.equal(getFlatten().arrayErrorConcatenate(
-      ['']),
-      ''
-    );
-  })
-
-  it('array of errors are concatenated', () => {
-    assert.equal(getFlatten().arrayErrorConcatenate(
-      ['first error', 'second error']),
-      'first error. second error'
-    );
-  })
-});
 
 describe('flatten', () => {
   function getNestedObject() {
     return Immutable.fromJS({
-      errorProp: 'Im not an array',
+      errorProp: ['Im not an array'],
       errorInArray: ['Im in an array', 'me too'],
       nestedObject: {
         evenMoreNested: {
           invalidNames: ['Theres some invalid names in here', 'more than one it seems'],
-          isError: 'yes, there is an error'
+          isError: ['yes, there is an error']
         }
       }
     });
   }
 
-  it('returns an empty string for a null object', () => {
+  function getResponse() {
+    return [
+      'Im not an array.',
+      'Im in an array.',
+      'me too.',
+      'Theres some invalid names in here.',
+      'more than one it seems.',
+      'yes, there is an error.'
+    ].join(' ');
+  }
+
+  it('returns an empty set for a null object', () => {
     assert.equal(
       getFlatten().flatten(null),
-      ''
-    );
-  });
-
-  it('returns a string when a string is passed', () => {
-    assert.equal(
-      getFlatten().flatten('an error'),
-      'an error'
+      Immutable.OrderedSet()
     );
   });
 
   it('returns a string for one error in an object', () => {
     assert.equal(
-      getFlatten().flatten(Immutable.fromJS({ onlyOne: 'error' })),
+      getFlatten().flatten(Immutable.fromJS({ onlyOne: ['error'] })).toList().join(' '),
       'error'
     )
   });
@@ -78,29 +57,91 @@ describe('flatten', () => {
     assert.equal(
       getFlatten().flatten(Immutable.fromJS(
         {
-          firstError: 'error',
+          firstError: ['error'],
           nestedError: {
-            secondError: 'another one'
+            secondError: ['another one']
           }
         }
-      )),
-      'error. another one'
+      )).toList().join('. ') + '.',
+      'error. another one.'
     )
   });
 
-  xit('gets concatenated into one string', () => {
+  it('gets concatenated into one string', () => {
     assert.equal(
-      getFlatten().flatten(getNestedObject()),
-      `Im not an array.
-        Im in an array.
-        me too.
-        Theres some invalid names in here.
-        more than one it seems`
+      getFlatten().flatten(getNestedObject()).toList().join('. ') + '.',
+      getResponse()
+    );
+  });
+
+  it('removes duplicates from same level', () => {
+    assert.equal(
+      getFlatten().flatten(Immutable.fromJS({
+        firstError: ['Not unique'],
+        secondError: ['Not unique'],
+      })).toList().join('. ') + '.',
+      'Not unique.'
+    );
+  });
+
+  it('removes duplicates from deeper levels', () => {
+    assert.equal(
+      getFlatten().flatten(Immutable.fromJS({
+        firstError: ['Not unique'],
+        secondError: {
+          error: ['Not unique'],
+        },
+      })).toList().join('. ') + '.',
+      'Not unique.'
+    );
+  });
+
+  it('removes duplicates from array of objects', () => {
+    assert.equal(
+      getFlatten().flatten(Immutable.fromJS({
+        tags: [
+          {
+            non_field_errors: ['Only alphanumeric characters are allowed'],
+            third_error: ['Third error']
+          },
+          {
+            non_field_errors: [
+              'Minumum length of 10 characters is required',
+              'Only alphanumeric characters are allowed',
+            ],
+          }]
+        })).flatten().toList().join('. ') + '.',
+      'Only alphanumeric characters are allowed. Third error. Minumum length of 10 characters is required.'
     );
   });
 });
 
-xit('should tranform errors', () => {
+describe('join', () => {
+  it('single item', () => {
+    assert.equal(
+      getFlatten().join(Immutable.List(['Single']), ' ', '.'),
+      'Single.'
+    );
+  });
+
+  it('multiple items', () => {
+    assert.equal(
+      getFlatten().join(Immutable.List(['first', 'second']), ' ', '.'),
+      'first. second.'
+    );
+  });
+});
+
+describe('preserveNesting', () => {
+  it('single list error is returned with period', () => {
+    assert.equal(
+      getFlatten().preserveNesting(Immutable.List(['Single error'])),
+      'Single error.'
+    );
+  });
+});
+
+it('should tranform errors', () => {
   // example error object returned from API converted to Immutable.Map
   const errors = Immutable.fromJS({
     name: ['This field is required'],
